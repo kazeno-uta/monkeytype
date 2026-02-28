@@ -195,7 +195,7 @@ export function restart(options = {} as RestartOptions): void {
       options.withSameWordset = true;
     }
 
-    if (TestState.savingEnabled) {
+    if (Config.resultSaving) {
       TestInput.pushKeypressesToHistory();
       TestInput.pushErrorToHistory();
       TestInput.pushAfkToHistory();
@@ -1011,14 +1011,6 @@ export async function finish(difficultyFailed = false): Promise<void> {
       duration: 1,
     });
     dontSave = true;
-  } else if (afkDetected) {
-    Notifications.add("Test invalid - AFK detected", 0);
-    TestStats.setInvalid();
-    dontSave = true;
-  } else if (TestState.isRepeated) {
-    Notifications.add("Test invalid - repeated", 0);
-    TestStats.setInvalid();
-    dontSave = true;
   } else if (
     completedEvent.testDuration < 1 ||
     (Config.mode === "time" && mode2Number < 15 && mode2Number > 0) ||
@@ -1041,6 +1033,14 @@ export async function finish(difficultyFailed = false): Promise<void> {
     Notifications.add("Test invalid - too short", 0);
     TestStats.setInvalid();
     tooShort = true;
+    dontSave = true;
+  } else if (afkDetected) {
+    Notifications.add("Test invalid - AFK detected", 0);
+    TestStats.setInvalid();
+    dontSave = true;
+  } else if (TestState.isRepeated) {
+    Notifications.add("Test invalid - repeated", 0);
+    TestStats.setInvalid();
     dontSave = true;
   } else if (
     completedEvent.wpm < 0 ||
@@ -1192,28 +1192,13 @@ async function saveResult(
 ): Promise<null | Awaited<ReturnType<typeof Ape.results.add>>> {
   AccountButton.loading(true);
 
-  if (!TestState.savingEnabled) {
+  if (!Config.resultSaving) {
     Notifications.add("Result not saved: disabled by user", -1, {
       duration: 3,
       customTitle: "Notice",
       important: true,
     });
     AccountButton.loading(false);
-    return null;
-  }
-
-  if (!ConnectionState.get()) {
-    Notifications.add("Result not saved: offline", -1, {
-      duration: 2,
-      customTitle: "Notice",
-      important: true,
-    });
-    AccountButton.loading(false);
-    retrySaving.canRetry = true;
-    qs("#retrySavingResultButton")?.show();
-    if (!isRetrying) {
-      retrySaving.completedEvent = completedEvent;
-    }
     return null;
   }
 
@@ -1355,7 +1340,7 @@ export function fail(reason: string): void {
   TestInput.pushErrorToHistory();
   TestInput.pushAfkToHistory();
   void finish(true);
-  if (!TestState.savingEnabled) return;
+  if (!Config.resultSaving) return;
   const testSeconds = TestStats.calculateTestSeconds(performance.now());
   const afkseconds = TestStats.calculateAfkSeconds(testSeconds);
   let tt = Numbers.roundTo2(testSeconds - afkseconds);
